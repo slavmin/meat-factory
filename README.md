@@ -7,3 +7,6 @@
 5. Run `docker compose exec -it php-fpm composer run-script post-create-project-cmd` to initialize a project.
 6. Run `docker compose exec -it php-fpm php artisan migrate:fresh --seed` to run migrations.
 7. Run `docker compose exec -it php-fpm php artisan test` to run tests
+
+### Documentation
+ - Postman collection in folder `docs`
