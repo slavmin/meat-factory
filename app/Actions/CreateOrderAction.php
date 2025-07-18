@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Actions;
 
 use App\Models\Order;
-use App\Models\OrderProduct;
 use App\Models\Product;
 use App\Models\User;
 use Exception;
@@ -17,20 +16,18 @@ final class CreateOrderAction
     public static function handle(Request $request, User $user): Order|string
     {
         try {
-            DB::beginTransaction();
+            $orderItems = $request->input('items');
+            $productQuantity = array_column($orderItems, 'quantity', 'product_id');
 
-            $products = $productQuantity = [];
+            $products = Product::query()->whereIn('id', array_keys($productQuantity))->get();
 
-            foreach ($request->input('items') as $item) {
-                $product = Product::query()->findOrFail($item['product_id']);
-
-                if ($product->stock < $item['quantity']) {
+            foreach ($products as $product) {
+                if ($product->stock < $productQuantity[$product->id]) {
                     throw new Exception("Not enough stock for product {$product->id}, only {$product->stock} available");
                 }
-
-                $products[] = $product;
-                $productQuantity[$product->id] = $item['quantity'];
             }
+
+            DB::beginTransaction();
 
             $order = Order::query()->create([
                 'user_id' => $request->input('user_id'),
@@ -42,7 +39,7 @@ final class CreateOrderAction
             $total = 0;
 
             foreach ($products as $product) {
-                $orderItem = OrderProduct::query()->create([
+                $order->items()->create([
                     'order_id' => $order->id,
                     'product_id' => $product->id,
                     'quantity' => $productQuantity[$product->id],
@@ -54,7 +51,7 @@ final class CreateOrderAction
                 $product->decrement('stock', $productQuantity[$product->id]);
             }
 
-            $order->update(['total' => $total]);
+            $order->updateQuietly(['total' => $total]);
 
             DB::commit();
 
